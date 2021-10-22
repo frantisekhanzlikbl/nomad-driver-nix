@@ -1,11 +1,7 @@
-PLUGIN_BINARY=hello-driver
-export GO111MODULE=on
+PLUGIN_BINARY=nix-driver
 
 default: build
 
-.PHONY: clean
-clean: ## Remove build artifacts
-	rm -rf ${PLUGIN_BINARY}
-
 build:
-	go build -o ${PLUGIN_BINARY} .
+	nix -L build
+	cp -f result/bin/nix-driver nix-driver

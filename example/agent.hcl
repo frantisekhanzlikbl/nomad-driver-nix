@@ -1,7 +1,6 @@
 log_level = "TRACE"
 
-plugin "hello-driver" {
+plugin "nix-driver" {
   config {
-    shell = "bash"
   }
 }

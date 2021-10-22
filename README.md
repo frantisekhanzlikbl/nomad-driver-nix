@@ -19,7 +19,7 @@ Requirements
 Building the Skeleton Plugin
 -------------------
 
-[Generate](https://github.com/hashicorp/nomad-skeleton-driver-plugin/generate)
+[Generate](https://github.com/input-output-hk/nomad-nix-driver/generate)
 a new repository in your account from this template by clicking the `Use this
 template` button above.
 
@@ -38,7 +38,7 @@ match your repository path.
 ```diff
 // go.mod
 
-- module github.com/hashicorp/nomad-skeleton-driver-plugin
+- module github.com/input-output-hk/nomad-driver-nix
 + module github.com/<ORG>/<REPO>
 ...
 ```
@@ -50,7 +50,7 @@ package main
 
 import (
     log "github.com/hashicorp/go-hclog"
--   "github.com/hashicorp/nomad-skeleton-driver-plugin/hello"
+-   "github.com/input-output-hk/nomad-driver-nix/nix"
 +.  "github.com/<REPO>/<ORG>/hello"
 ...
 

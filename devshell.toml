@@ -1,0 +1,44 @@
+imports = [
+  "language.go"
+]
+
+[[commands]]
+package = "go"
+
+[[commands]]
+package = "golangci-lint"
+
+[[commands]]
+package = "foreman"
+
+[[commands]]
+package = "nomad"
+
+[[commands]]
+package = "damon"
+
+[[commands]]
+name = "lint"
+command = "gocritic check -enableAll ./... && fd -e nix -X nixfmt -c"
+help = "Run code linters"
+
+[[commands]]
+name = "spawn"
+command = "systemd-nspawn --volatile=overlay --image result/tarball/nixos-system-x86_64-linux.tar.xz --read-only --boot --register=false"
+help = "Run systemd-nspawn"
+
+[devshell]
+name = "nomad-driver-nix"
+packages = [
+  "diffutils",
+  "go",
+  "goimports",
+  "gopls",
+  "gocode",
+  "gcc",
+  "sqliteInteractive",
+  "gocritic",
+  "fd",
+  "nixfmt",
+  "gnumake",
+]
