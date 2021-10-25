@@ -120,9 +120,10 @@ type MachineConfig struct {
 	Volatile         string             `codec:"volatile"`
 	WorkingDirectory string             `codec:"working_directory"`
 	imagePath        string             `codec:"-"`
-	Flake            string             `codec:"flake"`
 	Directory        string             `codec:"directory"`
 	LinkJournal      string             `codec:"link_journal"`
+	NixOS            string             `codec:"nixos"`
+	NixPackages      []string           `codec:"packages"`
 }
 
 type ImageType string
@@ -307,6 +308,10 @@ func (c *MachineConfig) Validate() error {
 		}
 	}
 
+	if c.NixOS != "" && len(c.NixPackages) > 0 {
+		return fmt.Errorf("nixos and packages may not be combined")
+	}
+
 	return nil
 }
 
@@ -362,9 +367,10 @@ func ConfigureIPTablesRules(delete bool, interfaces []string) error {
 	}
 
 	for _, i := range interfaces {
-		rules := [][]string{[]string{"-o", i, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
-			[]string{"-i", i, "!", "-o", i, "-j", "ACCEPT"},
-			[]string{"-i", i, "-o", i, "-j", "ACCEPT"},
+		rules := [][]string{
+			{"-o", i, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
+			{"-i", i, "!", "-o", i, "-j", "ACCEPT"},
+			{"-i", i, "-o", i, "-j", "ACCEPT"},
 		}
 
 		for _, r := range rules {
@@ -548,13 +554,48 @@ func DescribeImage(name string) (*ImageProps, error) {
 	}, nil
 }
 
-func nixBuildFlake(flake string) (string, string, error) {
-	closurePath, err := buildClosure(flake)
+func nixBuildProfile(flakes []string, link string) (string, error) {
+	cmd := exec.Command("nix", append([]string{"profile", "install", "--profile", link}, flakes...)...)
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%v failed: %s. Err: %v", cmd.Args, stderr.String(), err)
+	}
+
+	if target, err := os.Readlink(link); err == nil {
+		return os.Readlink(filepath.Join(filepath.Dir(link), target))
+	} else {
+		return "", err
+	}
+}
+
+func nixBuildClosure(flakes []string, link string) (string, error) {
+	j, err := json.Marshal(flakes)
+	if err != nil {
+		return "", err
+	}
+
+	cmd := exec.Command("nix", "build", "--out-link", link, "-f", "./closure.nix", "--argstr", "flakes", string(j))
+
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%v failed: %s. Err: %v", cmd.Args, stderr.String(), err)
+	}
+
+	return os.Readlink(link)
+}
+
+func nixBuildNixOS(flakePrefix string) (string, string, error) {
+	nixos := fmt.Sprintf("%s.config.system.build", flakePrefix)
+	closurePath, err := nixBuild(nixos + ".closure")
 	if err != nil {
 		return "", "", fmt.Errorf("buildClosure failed: %v", err)
 	}
 
-	toplevelPath, err := buildToplevel(flake)
+	toplevelPath, err := nixBuild(nixos + ".toplevel")
 	if err != nil {
 		return "", "", fmt.Errorf("buildToplevel failed: %v", err)
 	}
@@ -562,31 +603,22 @@ func nixBuildFlake(flake string) (string, string, error) {
 	return closurePath, toplevelPath, nil
 }
 
-func buildClosure(flake string) (string, error) {
-	return nixBuild(flake, "closure")
-}
-
-func buildToplevel(flake string) (string, error) {
-	return nixBuild(flake, "toplevel")
-}
-
 type nixBuildResult struct {
 	DrvPath string
 	Outputs map[string]string
 }
 
-func nixBuild(flakePrefix, attr string) (string, error) {
-	flake := fmt.Sprintf("%s.config.system.build.%s", flakePrefix, attr)
-	buildClosure := exec.Command("nix", "build", "--no-link", "--json", flake)
+func nixBuild(flake string) (string, error) {
+	cmd := exec.Command("nix", "build", "--no-link", "--json", flake)
 
 	stdout := &bytes.Buffer{}
-	buildClosure.Stdout = stdout
+	cmd.Stdout = stdout
 
 	stderr := &bytes.Buffer{}
-	buildClosure.Stderr = stderr
+	cmd.Stderr = stderr
 
-	if err := buildClosure.Run(); err != nil {
-		return "", fmt.Errorf("%v failed: %s. Err: %v", buildClosure.Args, stderr.String(), err)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%v failed: %s. Err: %v", cmd.Args, stderr.String(), err)
 	}
 
 	result := []*nixBuildResult{}
@@ -608,16 +640,16 @@ type nixPathInfo struct {
 }
 
 func nixRequisites(path string) ([]string, error) {
-	pathInfo := exec.Command("nix", "path-info", "--json", "--recursive", path)
+	cmd := exec.Command("nix", "path-info", "--json", "--recursive", path)
 
 	stdout := &bytes.Buffer{}
-	pathInfo.Stdout = stdout
+	cmd.Stdout = stdout
 
 	stderr := &bytes.Buffer{}
-	pathInfo.Stderr = stderr
+	cmd.Stderr = stderr
 
-	if err := pathInfo.Run(); err != nil {
-		return nil, fmt.Errorf("%v failed: %s. Err: %v", pathInfo.Args, stderr.String(), err)
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%v failed: %s. Err: %v", cmd.Args, stderr.String(), err)
 	}
 
 	result := []*nixPathInfo{}

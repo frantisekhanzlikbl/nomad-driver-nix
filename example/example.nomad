@@ -6,15 +6,25 @@ job "example" {
     task "example" {
       driver = "nix"
 
+      resources {
+        memory = 8000
+        cpu = 9000
+      }
+
       config {
+        # nixos = "/home/manveru/github/input-output-hk/nomad-driver-nix#nixosConfigurations.example"
+
+        packages = ["github:nixos/nixpkgs/nixos-21.05#grafana-loki"]
+        command = ["/bin/loki"]
+
         resolv_conf = "copy-host"
-        flake = "/home/manveru/github/input-output-hk/nomad-driver-nix#nixosConfigurations.example"
-        command = ["/init"]
         boot = false
-        user_namespacing = true
+        user_namespacing = false
         network_veth = false
         console = "read-only"
         ephemeral = true
+        process_two = false
+        volatile = "overlay"
       }
     }
   }

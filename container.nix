@@ -9,6 +9,8 @@
   networking.useDHCP = false;
   networking.hostName = lib.mkDefault "nixos";
 
+  environment.systemPackages = [ pkgs.wrap-nix ];
+
   nix = {
     package = pkgs.nixUnstable;
     systemFeatures = [ "recursive-nix" "nixos-test" ];

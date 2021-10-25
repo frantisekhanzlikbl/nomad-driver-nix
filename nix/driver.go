@@ -111,8 +111,9 @@ var (
 		"ports":             hclspec.NewAttr("ports", "list(string)", false),
 		"capability":        hclspec.NewAttr("capability", "list(string)", false),
 		"network_zone":      hclspec.NewAttr("network_zone", "string", false),
-		"flake":             hclspec.NewAttr("flake", "string", true),
 		"link_journal":      hclspec.NewAttr("link_journal", "string", false),
+		"nixos":             hclspec.NewAttr("nixos", "string", false),
+		"packages":          hclspec.NewAttr("packages", "list(string)", false),
 	})
 
 	// capabilities is returned by the Capabilities RPC and indicates what
@@ -357,8 +358,8 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 		}
 	}
 
-	if driverConfig.Flake != "" {
-		closure, toplevel, err := nixBuildFlake(driverConfig.Flake)
+	if driverConfig.NixOS != "" {
+		closure, toplevel, err := nixBuildNixOS(driverConfig.NixOS)
 		if err != nil {
 			return nil, nil, fmt.Errorf("Build of the flake failed: %v", err)
 		}
@@ -368,8 +369,42 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 		}
 
 		driverConfig.BindReadOnly[toplevel] = toplevel
-		driverConfig.BindReadOnly[closure+"/registration"] = "/registration"
-		driverConfig.BindReadOnly[toplevel+"/init"] = "/init"
+		driverConfig.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
+		driverConfig.BindReadOnly[filepath.Join(toplevel, "init")] = "/init"
+		driverConfig.BindReadOnly[filepath.Join(toplevel, "sw")] = "/sw"
+
+		requisites, err := nixRequisites(closure)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Couldn't determine flake requisites: %v", err)
+		}
+
+		for _, requisite := range requisites {
+			driverConfig.BindReadOnly[requisite] = requisite
+		}
+
+		driverConfig.Directory = taskDirs.Dir
+	}
+
+	if len(driverConfig.NixPackages) > 0 {
+		profileLink := filepath.Join(taskDirs.Dir, "current-profile")
+		profile, err := nixBuildProfile(driverConfig.NixPackages, profileLink)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Build of the flakes failed: %v", err)
+		}
+
+		closureLink := filepath.Join(taskDirs.Dir, "current-closure")
+		closure, err := nixBuildClosure(driverConfig.NixPackages, closureLink)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Build of the flakes failed: %v", err)
+		}
+
+		if driverConfig.BindReadOnly == nil {
+			driverConfig.BindReadOnly = make(hclutils.MapStrStr)
+		}
+
+		driverConfig.BindReadOnly[profile] = profile
+		driverConfig.BindReadOnly[filepath.Join(profile, "bin")] = "/bin"
+		driverConfig.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
 
 		requisites, err := nixRequisites(closure)
 		if err != nil {
@@ -463,8 +498,6 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 
 		}
 	}
-
-	d.logger.Debug("starting nspawn task", "driver_cfg", hclog.Fmt("%+v", driverConfig))
 
 	// Validate config
 	if err := driverConfig.Validate(); err != nil {

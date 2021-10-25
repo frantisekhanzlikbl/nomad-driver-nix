@@ -47,7 +47,7 @@
           '';
         };
 
-        example-rb = prev.writeScriptBin "example-rb" ''
+        example = prev.writeScriptBin "example" ''
           #!${prev.ruby}/bin/ruby
 
           require "fileutils"
@@ -62,40 +62,44 @@
 
           result = File.readlink("./result")
 
-          paths = `nix-store --query --requisites #{result}`.lines.map(&:strip).flatten.sort.uniq
+          paths = `nix-store --query --requisites #{closure}`.lines.map(&:strip).flatten.sort.uniq
+          paths << result
 
           binds = paths.map{|path| "--bind-ro=#{path}" }
           binds << "--bind-ro=#{closure}/registration:/registration"
           binds << "--bind-ro=#{result}/init:/init"
+          binds << "--bind-ro=#{result}/etc:/etc"
+          binds << "--bind-ro=${final.cacert}/etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-bundle.crt"
+
+          system("sudo", "chattr", "-i", "testing/var/empty")
+          system("sudo", "rm", "-rf", "testing")
+          FileUtils.mkdir_p "testing"
 
           exec("sudo", "systemd-nspawn",
             *binds,
-            "--setenv", "PATH=/sw/bin",
+            "--setenv", "PATH=#{result}/sw/bin",
+            "--setenv", "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt",
             "--volatile=overlay",
-            # "--as-pid2", "#{result}/sw/bin/hostname"
-            "/init"
+            "--directory", "testing",
+            "--as-pid2",
+            "nix",
+              "--extra-experimental-features",
+              "nix-command flakes",
+              "run",
+              "github:nixos/nixpkgs#bash"
           )
         '';
 
-        example = prev.writeShellScriptBin "example" ''
+        wrap-nix = prev.writeShellScriptBin "nix" ''
           set -exuo pipefail
-
-          sudo chattr -i testing/var/empty || true
-          sudo rm -rf testing
-          mkdir -p testing
-
-          nix build .#nixosConfigurations.example.config.system.build.toplevel
-
-          sudo systemd-nspawn \
-            --bind-ro=/nix/store \
-            --setenv PATH=/sw/bin \
-            --directory ./testing \
-            $(realpath ./result/init)
+          export PATH="${final.nixUnstable}/bin:$PATH"
+          ${final.nixUnstable}/bin/nix-store --load-db < /registration
+          exec ${final.nixUnstable}/bin/nix "$@"
         '';
       };
 
-      packages = { nomad-driver-nix, bash, coreutils, gocritic, example
-        , example-rb }@pkgs:
+      packages =
+        { nomad-driver-nix, bash, coreutils, gocritic, example, wrap-nix }@pkgs:
         pkgs // {
           lib = nixpkgs.lib;
           defaultPackage = nomad-driver-nix;
@@ -107,6 +111,7 @@
           specialArgs.self = self;
           modules = [
             ({ config, lib, pkgs, ... }: {
+              nixpkgs.overlays = [ self.overlay ];
               system.build.closure = pkgs.buildPackages.closureInfo {
                 rootPaths = [ config.system.build.toplevel ];
               };
@@ -118,8 +123,9 @@
                 touch /etc/NIXOS
                 ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
               '';
+
+              networking.hostName = "example";
             })
-            { networking.hostName = "example"; }
             ./container.nix
           ];
         };
