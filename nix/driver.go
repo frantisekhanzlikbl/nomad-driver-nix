@@ -1,6 +1,7 @@
 package nix
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -416,6 +417,10 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 		}
 
 		driverConfig.Directory = taskDirs.Dir
+
+		if _, found := driverConfig.Environment["PATH"]; !found {
+			driverConfig.Environment["PATH"] = "/bin"
+		}
 	}
 
 	if driverConfig.Properties == nil {
@@ -831,17 +836,31 @@ func (d *Driver) ExecTaskStreamingRaw(ctx context.Context,
 		return drivers.ErrTaskNotFound
 	}
 
+	leader := handle.machine.Leader
+
+	environ, err := os.Open(fmt.Sprintf("/proc/%d/environ", leader))
+	if err != nil {
+		return err
+	}
+	defer environ.Close()
+
+	s := bufio.NewScanner(environ)
+	s.Scan()
+
+	cmd := []string{
+		"nsenter",
+		"--target", strconv.FormatInt(int64(leader), 10),
+		"--all", "/bin/env", "-i", "-",
+	}
+
+	for name, value := range readEnviron(leader) {
+		cmd = append(cmd, name+"="+value)
+	}
+
 	if err := execSupported(handle); err != nil {
 		return err
 	}
 
-	cmd := []string{"systemd-run", "--wait", "--service-type=exec",
-		"--collect", "--quiet", "--machine", handle.machine.Name}
-	if tty {
-		cmd = append(cmd, "--pty", "--send-sighup")
-	} else {
-		cmd = append(cmd, "--pipe")
-	}
 	cmd = append(cmd, command...)
 
 	return handle.exec.ExecStreaming(ctx, cmd, tty, stream)

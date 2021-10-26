@@ -14,8 +14,11 @@ job "example" {
       config {
         # nixos = "/home/manveru/github/input-output-hk/nomad-driver-nix#nixosConfigurations.example"
 
-        packages = ["github:nixos/nixpkgs/nixos-21.05#grafana-loki"]
-        command = ["/bin/loki"]
+        packages = [
+          "github:nixos/nixpkgs/nixos-21.05#bash",
+          "github:nixos/nixpkgs/nixos-21.05#coreutils"
+        ]
+        command = ["/bin/bash", "-c", "sleep 6000"]
 
         resolv_conf = "copy-host"
         boot = false

@@ -1,6 +1,7 @@
 package nix
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -576,7 +577,11 @@ func nixBuildClosure(flakes []string, link string) (string, error) {
 		return "", err
 	}
 
-	cmd := exec.Command("nix", "build", "--out-link", link, "-f", "./closure.nix", "--argstr", "flakes", string(j))
+	cmd := exec.Command(
+		"nix", "build",
+		"--out-link", link,
+		"-f", "./closure.nix",
+		"--argstr", "flakes", string(j))
 
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
@@ -775,4 +780,39 @@ func (c *MachineConfig) GetImagePath() (string, error) {
 		return "", err
 	}
 	return p.Path, nil
+}
+
+func readEnviron(pid uint32) map[string]string {
+	environ, err := os.Open(fmt.Sprintf("/proc/%d/environ", pid))
+	if err != nil {
+		panic(err)
+	}
+	defer environ.Close()
+
+	s := bufio.NewScanner(environ)
+	s.Split(
+		func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+			if atEOF && len(data) == 0 {
+				return 0, nil, nil
+			}
+
+			if i := bytes.IndexByte(data, '\000'); i >= 0 {
+				return i + 1, data[0:i], nil
+			}
+
+			if atEOF {
+				return len(data), data, nil
+			}
+
+			return 0, nil, nil
+		})
+
+	env := map[string]string{}
+
+	for s.Scan() {
+		foo := strings.SplitN(s.Text(), "=", 2)
+		env[foo[0]] = foo[1]
+	}
+
+	return env
 }
