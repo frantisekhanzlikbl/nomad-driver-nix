@@ -21,7 +21,7 @@
 
         nomad-driver-nix = prev.buildGoModule rec {
           pname = "nomad-driver-nix";
-          version = "2021.10.27.001";
+          version = "2021.10.27.002";
           vendorSha256 = "sha256-FDJpbNtcFEHnZvWip2pvUHF3BFyfcSohrr/3nk9YS24=";
 
           src = inputs.inclusive.lib.inclusive ./. [
@@ -95,6 +95,15 @@
           export PATH="${final.nixUnstable}/bin:$PATH"
           ${final.nixUnstable}/bin/nix-store --load-db < /registration
           exec ${final.nixUnstable}/bin/nix "$@"
+        '';
+
+        nix-setup = prev.writeShellScript "nix-setup" ''
+          export PATH="$PATH:${prev.git}/bin:${prev.nixUnstable}/bin"
+          export SSL_CERT_FILE="${prev.cacert}/etc/ssl/certs/ca-bundle.crt"
+
+          ${prev.coreutils}/bin/mkdir -p /etc
+          echo 'nixbld:x:30000:nixbld1' > /etc/group
+          echo 'nixbld1:x:30001:30000:Nix build user 1:/var/empty:${prev.shadow}/bin/nologin' > /etc/passwd
         '';
       };
 

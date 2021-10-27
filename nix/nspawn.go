@@ -457,7 +457,7 @@ func MachineAddresses(name string, timeout time.Duration) (*MachineAddrs, error)
 	defer dbusConn.Close()
 
 	obj := dbusConn.Object("org.freedesktop.machine1", dbus.ObjectPath(dbusPath))
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	done := make(chan bool)
 	go func() {
 		time.Sleep(timeout)
