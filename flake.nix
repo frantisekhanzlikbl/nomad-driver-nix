@@ -21,7 +21,7 @@
 
         nomad-driver-nix = prev.buildGoModule rec {
           pname = "nomad-driver-nix";
-          version = "2021.10.26.001";
+          version = "2021.10.27.001";
           vendorSha256 = "sha256-FDJpbNtcFEHnZvWip2pvUHF3BFyfcSohrr/3nk9YS24=";
 
           src = inputs.inclusive.lib.inclusive ./. [

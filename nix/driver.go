@@ -67,22 +67,31 @@ var (
 	taskConfigSpec = hclspec.NewObject(map[string]*hclspec.Spec{
 		"boot": hclspec.NewDefault(
 			hclspec.NewAttr("boot", "bool", false),
+			hclspec.NewLiteral("false"),
+		),
+		"ephemeral": hclspec.NewDefault(
+			hclspec.NewAttr("ephemeral", "bool", false),
 			hclspec.NewLiteral("true"),
 		),
-		"ephemeral": hclspec.NewAttr("ephemeral", "bool", false),
 		"network_veth": hclspec.NewDefault(
 			hclspec.NewAttr("network_veth", "bool", false),
-			hclspec.NewLiteral("true"),
+			hclspec.NewLiteral("false"),
 		),
-		"process_two": hclspec.NewAttr("process_two", "bool", false),
-		"read_only":   hclspec.NewAttr("read_only", "bool", false),
+		"process_two": hclspec.NewDefault(
+			hclspec.NewAttr("process_two", "bool", false),
+			hclspec.NewLiteral("false"),
+		),
+		"read_only": hclspec.NewAttr("read_only", "bool", false),
 		"user_namespacing": hclspec.NewDefault(
 			hclspec.NewAttr("user_namespacing", "bool", false),
-			hclspec.NewLiteral("true"),
+			hclspec.NewLiteral("false"),
 		),
 		"command": hclspec.NewAttr("command", "list(string)", false),
-		"console": hclspec.NewAttr("console", "string", false),
-		"image":   hclspec.NewAttr("image", "string", false),
+		"console": hclspec.NewDefault(
+			hclspec.NewAttr("console", "string", false),
+			hclspec.NewLiteral(`"read-only"`),
+		),
+		"image": hclspec.NewAttr("image", "string", false),
 		"image_download": hclspec.NewBlock("image_download", false,
 			hclspec.NewObject(map[string]*hclspec.Spec{
 				"url": hclspec.NewAttr("url", "string", true),
@@ -100,10 +109,16 @@ var (
 				),
 			})),
 		// "machine":           hclspec.NewAttr("machine", "string", false),
-		"pivot_root":        hclspec.NewAttr("pivot_root", "string", false),
-		"resolv_conf":       hclspec.NewAttr("resolv_conf", "string", false),
-		"user":              hclspec.NewAttr("user", "string", false),
-		"volatile":          hclspec.NewAttr("volatile", "string", false),
+		"pivot_root": hclspec.NewAttr("pivot_root", "string", false),
+		"resolv_conf": hclspec.NewDefault(
+			hclspec.NewAttr("resolv_conf", "string", false),
+			hclspec.NewLiteral(`"copy-host"`),
+		),
+		"user": hclspec.NewAttr("user", "string", false),
+		"volatile": hclspec.NewDefault(
+			hclspec.NewAttr("volatile", "string", false),
+			hclspec.NewLiteral(`"overlay"`),
+		),
 		"working_directory": hclspec.NewAttr("working_directory", "string", false),
 		"bind":              hclspec.NewAttr("bind", "list(map(string))", false),
 		"bind_read_only":    hclspec.NewAttr("bind_read_only", "list(map(string))", false),
@@ -384,6 +399,10 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 		}
 
 		driverConfig.Directory = taskDirs.Dir
+
+		if len(driverConfig.Command) == 0 {
+			driverConfig.Command = []string{"/init"}
+		}
 	}
 
 	if len(driverConfig.NixPackages) > 0 {
