@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -610,6 +611,15 @@ func nixBuildProfile(flakes []string, link string) (string, error) {
 }
 
 func nixBuildClosure(flakes []string, link string) (string, error) {
+	for i, flake := range flakes {
+		r := regexp.MustCompile(`^path:\.(.*)$`)
+		dir, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		flakes[i] = r.ReplaceAllString(flake, `path:`+dir+`$1`)
+	}
+
 	j, err := json.Marshal(flakes)
 	if err != nil {
 		return "", err
