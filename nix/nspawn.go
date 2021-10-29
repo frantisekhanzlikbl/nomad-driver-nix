@@ -360,7 +360,7 @@ func DescribeMachine(name string, timeout time.Duration) (*MachineProps, error) 
 		return nil, e
 	}
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	done := make(chan bool)
 	go func() {
 		time.Sleep(timeout)
@@ -400,9 +400,9 @@ func ConfigureIPTablesRules(delete bool, interfaces []string) error {
 		return fmt.Errorf("no network interfaces configured")
 	}
 
-	t, e := iptables.New()
-	if e != nil {
-		return e
+	table, err := iptables.New()
+	if err != nil {
+		return err
 	}
 
 	for _, i := range interfaces {
@@ -413,16 +413,16 @@ func ConfigureIPTablesRules(delete bool, interfaces []string) error {
 		}
 
 		for _, r := range rules {
-			switch ok, err := t.Exists("filter", "FORWARD", r...); {
+			switch ok, err := table.Exists("filter", "FORWARD", r...); {
 			case err == nil && !ok:
-				e := t.Append("filter", "FORWARD", r...)
-				if e != nil {
-					return e
+				err := table.Append("filter", "FORWARD", r...)
+				if err != nil {
+					return err
 				}
 			case err == nil && ok && delete:
-				e := t.Delete("filter", "FORWARD", r...)
-				if e != nil {
-					return e
+				err := table.Delete("filter", "FORWARD", r...)
+				if err != nil {
+					return err
 				}
 			case err != nil:
 				return err
