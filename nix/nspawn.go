@@ -520,12 +520,20 @@ func (p *MachineProps) GetNetworkInterfaces() ([]string, error) {
 	return n, nil
 }
 
+var dbusConn *dbus.Conn
+var dbusConnM = sync.Mutex{}
+
 func MachineAddresses(name string, timeout time.Duration) (*MachineAddrs, error) {
-	dbusConn, err := setupPrivateSystemBus()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to dbus: %+v", err)
+	dbusConnM.Lock()
+	defer dbusConnM.Unlock()
+
+	if dbusConn == nil {
+		var err error
+		dbusConn, err = setupPrivateSystemBus()
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to dbus: %+v", err)
+		}
 	}
-	defer dbusConn.Close()
 
 	obj := dbusConn.Object("org.freedesktop.machine1", dbus.ObjectPath(dbusPath))
 
