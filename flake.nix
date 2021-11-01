@@ -21,7 +21,7 @@
 
         nomad-driver-nix = prev.buildGoModule rec {
           pname = "nomad-driver-nix";
-          version = "2021.10.29.002";
+          version = "2021.11.01.001";
           vendorSha256 = "sha256-FDJpbNtcFEHnZvWip2pvUHF3BFyfcSohrr/3nk9YS24=";
 
           src = inputs.inclusive.lib.inclusive ./. [
@@ -47,49 +47,6 @@
           '';
         };
 
-        example = prev.writeScriptBin "example" ''
-          #!${prev.ruby}/bin/ruby
-
-          require "fileutils"
-
-          system("nix", "build", ".#nixosConfigurations.example.config.system.build.closure") ||
-            (puts "Failed to build system closure"; exit 1)
-
-          closure = File.readlink("./result")
-
-          system("nix", "build", ".#nixosConfigurations.example.config.system.build.toplevel") ||
-            (puts "Failed to build system configuration"; exit 1)
-
-          result = File.readlink("./result")
-
-          paths = `nix-store --query --requisites #{closure}`.lines.map(&:strip).flatten.sort.uniq
-          paths << result
-
-          binds = paths.map{|path| "--bind-ro=#{path}" }
-          binds << "--bind-ro=#{closure}/registration:/registration"
-          binds << "--bind-ro=#{result}/init:/init"
-          binds << "--bind-ro=#{result}/etc:/etc"
-          binds << "--bind-ro=${final.cacert}/etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-bundle.crt"
-
-          system("sudo", "chattr", "-i", "testing/var/empty")
-          system("sudo", "rm", "-rf", "testing")
-          FileUtils.mkdir_p "testing"
-
-          exec("sudo", "systemd-nspawn",
-            *binds,
-            "--setenv", "PATH=#{result}/sw/bin",
-            "--setenv", "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt",
-            "--volatile=overlay",
-            "--directory", "testing",
-            "--as-pid2",
-            "nix",
-              "--extra-experimental-features",
-              "nix-command flakes",
-              "run",
-              "github:nixos/nixpkgs#bash"
-          )
-        '';
-
         wrap-nix = prev.writeShellScriptBin "nix" ''
           set -exuo pipefail
           export PATH="${final.nixUnstable}/bin:$PATH"
@@ -107,8 +64,7 @@
         '';
       };
 
-      packages =
-        { nomad-driver-nix, bash, coreutils, gocritic, example, wrap-nix }@pkgs:
+      packages = { nomad-driver-nix, bash, coreutils, gocritic, wrap-nix }@pkgs:
         pkgs // {
           lib = nixpkgs.lib;
           defaultPackage = nomad-driver-nix;
@@ -119,7 +75,10 @@
           system = "x86_64-linux";
           specialArgs.self = self;
           modules = [
-            ({ config, lib, pkgs, ... }: {
+            (nixpkgs + /nixos/modules/profiles/headless.nix)
+            (nixpkgs + /nixos/modules/profiles/minimal.nix)
+            (nixpkgs + /nixos/modules/misc/version.nix)
+            ({ lib, pkgs, self, config, ... }: {
               nixpkgs.overlays = [ self.overlay ];
               system.build.closure = pkgs.buildPackages.closureInfo {
                 rootPaths = [ config.system.build.toplevel ];
@@ -133,9 +92,37 @@
                 ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
               '';
 
-              networking.hostName = "example";
+              boot.isContainer = true;
+              networking.useDHCP = false;
+              networking.hostName = lib.mkDefault "example";
+
+              environment.systemPackages = [ pkgs.wrap-nix ];
+
+              nix = {
+                package = pkgs.nixUnstable;
+                systemFeatures = [ "recursive-nix" "nixos-test" ];
+                extraOptions = ''
+                  experimental-features = nix-command flakes ca-references recursive-nix
+                '';
+              };
+
+              users.users = {
+                nixos = {
+                  isNormalUser = true;
+                  extraGroups = [ "wheel" ];
+                  initialHashedPassword = "";
+                };
+
+                root.initialHashedPassword = "";
+              };
+
+              security.sudo = {
+                enable = lib.mkDefault true;
+                wheelNeedsPassword = lib.mkForce false;
+              };
+
+              # services.getty.autologinUser = "nixos";
             })
-            ./container.nix
           ];
         };
       };

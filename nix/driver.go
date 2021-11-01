@@ -375,70 +375,14 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 	}
 
 	if driverConfig.NixOS != "" {
-		closure, toplevel, err := nixBuildNixOS(driverConfig.NixOS)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Build of the flake failed: %v", err)
-		}
-
-		if driverConfig.BindReadOnly == nil {
-			driverConfig.BindReadOnly = make(hclutils.MapStrStr)
-		}
-
-		driverConfig.BindReadOnly[toplevel] = toplevel
-		driverConfig.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
-		driverConfig.BindReadOnly[filepath.Join(toplevel, "init")] = "/init"
-		driverConfig.BindReadOnly[filepath.Join(toplevel, "sw")] = "/sw"
-
-		requisites, err := nixRequisites(closure)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Couldn't determine flake requisites: %v", err)
-		}
-
-		for _, requisite := range requisites {
-			driverConfig.BindReadOnly[requisite] = requisite
-		}
-
-		driverConfig.Directory = taskDirs.Dir
-
-		if len(driverConfig.Command) == 0 {
-			driverConfig.Command = []string{"/init"}
+		if err := driverConfig.prepareNixOS(taskDirs.Dir); err != nil {
+			return nil, nil, err
 		}
 	}
 
 	if len(driverConfig.NixPackages) > 0 {
-		profileLink := filepath.Join(taskDirs.Dir, "current-profile")
-		profile, err := nixBuildProfile(driverConfig.NixPackages, profileLink)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Build of the flakes failed: %v", err)
-		}
-
-		closureLink := filepath.Join(taskDirs.Dir, "current-closure")
-		closure, err := nixBuildClosure(driverConfig.NixPackages, closureLink)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Build of the flakes failed: %v", err)
-		}
-
-		if driverConfig.BindReadOnly == nil {
-			driverConfig.BindReadOnly = make(hclutils.MapStrStr)
-		}
-
-		driverConfig.BindReadOnly[profile] = profile
-		driverConfig.BindReadOnly[filepath.Join(profile, "bin")] = "/bin"
-		driverConfig.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
-
-		requisites, err := nixRequisites(closure)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Couldn't determine flake requisites: %v", err)
-		}
-
-		for _, requisite := range requisites {
-			driverConfig.BindReadOnly[requisite] = requisite
-		}
-
-		driverConfig.Directory = taskDirs.Dir
-
-		if _, found := driverConfig.Environment["PATH"]; !found {
-			driverConfig.Environment["PATH"] = "/bin"
+		if err := driverConfig.prepareNixPackages(taskDirs.Dir); err != nil {
+			return nil, nil, err
 		}
 	}
 

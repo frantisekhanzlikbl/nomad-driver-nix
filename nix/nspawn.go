@@ -3,6 +3,7 @@ package nix
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -165,6 +166,9 @@ type MachineConfig struct {
 	NixOS            string             `codec:"nixos"`
 	NixPackages      []string           `codec:"packages"`
 }
+
+func (c *MachineConfig) isNixOS() bool       { return c.NixOS != "" }
+func (c *MachineConfig) isNixPackages() bool { return len(c.NixPackages) > 0 }
 
 type ImageType string
 
@@ -348,36 +352,100 @@ func (c *MachineConfig) Validate() error {
 		}
 	}
 
-	if c.NixOS != "" && len(c.NixPackages) > 0 {
+	if c.isNixOS() && c.isNixPackages() {
 		return fmt.Errorf("nixos and packages may not be combined")
 	}
 
 	return nil
 }
 
-func DescribeMachine(name string, timeout time.Duration) (*MachineProps, error) {
-	c, e := machine1.New()
-	if e != nil {
-		return nil, e
+func (c *MachineConfig) prepareNixOS(dir string) error {
+	closure, toplevel, err := nixBuildNixOS(c.NixOS)
+	if err != nil {
+		return fmt.Errorf("Build of the flake failed: %v", err)
 	}
 
-	ticker := time.NewTicker(10 * time.Millisecond)
-	done := make(chan bool)
-	go func() {
-		time.Sleep(timeout)
-		done <- true
-	}()
+	if c.BindReadOnly == nil {
+		c.BindReadOnly = make(hclutils.MapStrStr)
+	}
 
-	var p map[string]interface{}
+	c.BindReadOnly[toplevel] = toplevel
+	c.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
+	c.BindReadOnly[filepath.Join(toplevel, "init")] = "/init"
+	c.BindReadOnly[filepath.Join(toplevel, "sw")] = "/sw"
+
+	requisites, err := nixRequisites(closure)
+	if err != nil {
+		return fmt.Errorf("Couldn't determine flake requisites: %v", err)
+	}
+
+	for _, requisite := range requisites {
+		c.BindReadOnly[requisite] = requisite
+	}
+
+	c.Directory = dir
+
+	if len(c.Command) == 0 {
+		c.Command = []string{"/init"}
+	}
+
+	return nil
+}
+
+func (c *MachineConfig) prepareNixPackages(dir string) error {
+	profileLink := filepath.Join(dir, "current-profile")
+	profile, err := nixBuildProfile(c.NixPackages, profileLink)
+	if err != nil {
+		return fmt.Errorf("Build of the flakes failed: %v", err)
+	}
+
+	closureLink := filepath.Join(dir, "current-closure")
+	closure, err := nixBuildClosure(c.NixPackages, closureLink)
+	if err != nil {
+		return fmt.Errorf("Build of the flakes failed: %v", err)
+	}
+
+	if c.BindReadOnly == nil {
+		c.BindReadOnly = make(hclutils.MapStrStr)
+	}
+
+	c.BindReadOnly[profile] = profile
+	c.BindReadOnly[filepath.Join(profile, "bin")] = "/bin"
+	c.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
+
+	requisites, err := nixRequisites(closure)
+	if err != nil {
+		return fmt.Errorf("Couldn't determine flake requisites: %v", err)
+	}
+
+	for _, requisite := range requisites {
+		c.BindReadOnly[requisite] = requisite
+	}
+
+	c.Directory = dir
+
+	if _, found := c.Environment["PATH"]; !found {
+		c.Environment["PATH"] = "/bin"
+	}
+
+	return nil
+}
+
+func DescribeMachine(name string, timeout time.Duration) (*MachineProps, error) {
+	c, err := machine1.New()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	for {
 		select {
-		case <-done:
-			ticker.Stop()
-			return nil, fmt.Errorf("timed out while getting machine properties: %+v", e)
-		case <-ticker.C:
-			p, e = c.DescribeMachine(name)
-			if e == nil {
-				ticker.Stop()
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timed out while getting machine properties: %+v", err)
+		default:
+			if p, err := c.DescribeMachine(name); err == nil {
 				return &MachineProps{
 					Name:               p["Name"].(string),
 					TimestampMonotonic: p["TimestampMonotonic"].(uint64),
@@ -391,6 +459,8 @@ func DescribeMachine(name string, timeout time.Duration) (*MachineProps, error) 
 					State:              p["State"].(string),
 					Unit:               p["Unit"].(string),
 				}, nil
+			} else {
+				time.Sleep(10 * time.Millisecond)
 			}
 		}
 	}
@@ -458,20 +528,16 @@ func MachineAddresses(name string, timeout time.Duration) (*MachineAddrs, error)
 	defer dbusConn.Close()
 
 	obj := dbusConn.Object("org.freedesktop.machine1", dbus.ObjectPath(dbusPath))
-	ticker := time.NewTicker(10 * time.Millisecond)
-	done := make(chan bool)
-	go func() {
-		time.Sleep(timeout)
-		done <- true
-	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	var result *dbus.Call
 	for {
 		select {
-		case <-done:
-			ticker.Stop()
+		case <-ctx.Done():
 			return nil, fmt.Errorf("timed out while getting machine addresses: %+v", result.Err)
-		case <-ticker.C:
+		default:
 			result = obj.Call(fmt.Sprintf("%s.%s", dbusInterface, "GetMachineAddresses"), 0, name)
 			if result.Err != nil {
 				return nil, fmt.Errorf("failed to call dbus: %+v", result.Err)
@@ -494,12 +560,12 @@ func MachineAddresses(name string, timeout time.Duration) (*MachineAddrs, error)
 			}
 
 			if len(addrs.IPv4) > 0 {
-				ticker.Stop()
 				return &addrs, nil
 			}
+
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
-
 }
 
 func isInstalled() error {
