@@ -70,32 +70,37 @@
           defaultPackage = nomad-driver-nix;
         };
 
+      extraOutputs.nixosModules = {
+        nix-driver-nomad = { pkgs, config, lib, ... }: {
+          system.build.closure = pkgs.buildPackages.closureInfo {
+            rootPaths = [ config.system.build.toplevel ];
+          };
+
+          boot.postBootCommands = lib.mkDefault ''
+            # After booting, register the contents of the Nix store in the container in the Nix database in the tmpfs.
+            ${config.nix.package.out}/bin/nix-store --load-db < /registration
+            # nixos-rebuild also requires a "system" profile and an /etc/NIXOS tag.
+            touch /etc/NIXOS
+            ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
+          '';
+
+          boot.isContainer = lib.mkDefault true;
+          networking.useDHCP = lib.mkDefault false;
+        };
+      };
+
       extraOutputs.nixosConfigurations = {
         example = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           specialArgs.self = self;
           modules = [
+            self.outputs.nixosModules.nix-driver-nomad
             (nixpkgs + /nixos/modules/profiles/headless.nix)
             (nixpkgs + /nixos/modules/profiles/minimal.nix)
             (nixpkgs + /nixos/modules/misc/version.nix)
             ({ lib, pkgs, self, config, ... }: {
               nixpkgs.overlays = [ self.overlay ];
-              system.build.closure = pkgs.buildPackages.closureInfo {
-                rootPaths = [ config.system.build.toplevel ];
-              };
-
-              boot.postBootCommands = ''
-                # After booting, register the contents of the Nix store in the container in the Nix database in the tmpfs.
-                ${config.nix.package.out}/bin/nix-store --load-db < /registration
-                # nixos-rebuild also requires a "system" profile and an /etc/NIXOS tag.
-                touch /etc/NIXOS
-                ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
-              '';
-
-              boot.isContainer = true;
-              networking.useDHCP = false;
               networking.hostName = lib.mkDefault "example";
-
               environment.systemPackages = [ pkgs.wrap-nix ];
 
               nix = {
@@ -120,8 +125,6 @@
                 enable = lib.mkDefault true;
                 wheelNeedsPassword = lib.mkForce false;
               };
-
-              # services.getty.autologinUser = "nixos";
             })
           ];
         };
