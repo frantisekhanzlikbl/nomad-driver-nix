@@ -431,10 +431,19 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 	return nil
 }
 
+var machineConn *machine1.Conn
+var machineConnM = sync.Mutex{}
+
 func DescribeMachine(name string, timeout time.Duration) (*MachineProps, error) {
-	c, err := machine1.New()
-	if err != nil {
-		return nil, err
+	machineConnM.Lock()
+	defer machineConnM.Unlock()
+
+	if machineConn == nil {
+		var err error
+		machineConn, err = machine1.New()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -443,9 +452,9 @@ func DescribeMachine(name string, timeout time.Duration) (*MachineProps, error) 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("timed out while getting machine properties: %+v", err)
+			return nil, fmt.Errorf("timed out while getting machine properties")
 		default:
-			if p, err := c.DescribeMachine(name); err == nil {
+			if p, err := machineConn.DescribeMachine(name); err == nil {
 				return &MachineProps{
 					Name:               p["Name"].(string),
 					TimestampMonotonic: p["TimestampMonotonic"].(uint64),
@@ -633,6 +642,9 @@ func setupPrivateSystemBus() (conn *dbus.Conn, err error) {
 }
 
 func DescribeImage(name string) (*ImageProps, error) {
+	dbusConnM.Lock()
+	defer dbusConnM.Unlock()
+
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil, err
