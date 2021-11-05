@@ -384,6 +384,7 @@ func (c *MachineConfig) prepareNixOS(dir string) error {
 	}
 
 	c.Directory = dir
+	c.createEtc()
 
 	if len(c.Command) == 0 {
 		c.Command = []string{"/init"}
@@ -422,6 +423,17 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 		c.BindReadOnly[requisite] = requisite
 	}
 
+	c.Directory = dir
+	c.createEtc()
+
+	if _, found := c.Environment["PATH"]; !found {
+		c.Environment["PATH"] = "/bin"
+	}
+
+	return nil
+}
+
+func (c *MachineConfig) createEtc() {
 	needEtc := true
 	for _, guestDir := range c.BindReadOnly {
 		if strings.HasPrefix("/usr/", guestDir) {
@@ -431,16 +443,8 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 	}
 
 	if needEtc {
-		os.MkdirAll(filepath.Join(dir, "usr"), 0777)
+		os.MkdirAll(filepath.Join(c.Directory, "usr"), 0777)
 	}
-
-	c.Directory = dir
-
-	if _, found := c.Environment["PATH"]; !found {
-		c.Environment["PATH"] = "/bin"
-	}
-
-	return nil
 }
 
 var machineConn *machine1.Conn
