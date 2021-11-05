@@ -422,6 +422,18 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 		c.BindReadOnly[requisite] = requisite
 	}
 
+	needEtc := true
+	for _, guestDir := range c.BindReadOnly {
+		if strings.HasPrefix("/usr/", guestDir) {
+			needEtc = false
+			break
+		}
+	}
+
+	if needEtc {
+		os.MkdirAll(filepath.Join(dir, "usr"), 0777)
+	}
+
 	c.Directory = dir
 
 	if _, found := c.Environment["PATH"]; !found {
