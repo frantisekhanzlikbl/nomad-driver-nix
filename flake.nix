@@ -46,20 +46,20 @@
           '';
         };
 
-        wrap-nix = prev.writeShellScriptBin "nix" ''
+        wrap-nix = prev.writeShellScriptBin prev.nixUnstable.name ''
           set -exuo pipefail
-          export PATH="${final.nixUnstable}/bin:$PATH"
-          ${final.nixUnstable}/bin/nix-store --load-db < /registration
-          exec ${final.nixUnstable}/bin/nix "$@"
-        '';
 
-        nix-setup = prev.writeShellScript "nix-setup" ''
-          export PATH="$PATH:${prev.git}/bin:${prev.nixUnstable}/bin"
+          export PATH="$PATH:${prev.git}/bin:${prev.nixUnstable}/bin:${prev.coreutils}/bin"
           export SSL_CERT_FILE="${prev.cacert}/etc/ssl/certs/ca-bundle.crt"
 
-          ${prev.coreutils}/bin/mkdir -p /etc
-          echo 'nixbld:x:30000:nixbld1' > /etc/group
-          echo 'nixbld1:x:30001:30000:Nix build user 1:/var/empty:${prev.shadow}/bin/nologin' > /etc/passwd
+          if ! id nixbld1 &> /dev/null; then
+              mkdir -p /etc
+              echo 'nixbld:x:30000:nixbld1' > /etc/group
+              echo 'nixbld1:x:30001:30000:Nix build user 1:/var/empty:${prev.shadow}/bin/nologin' > /etc/passwd
+              nix-store --load-db < /registration
+          fi
+
+          exec ${prev.nixUnstable}/bin/nix "$@"
         '';
       };
 
@@ -115,7 +115,6 @@
             ({ lib, pkgs, self, config, ... }: {
               nixpkgs.overlays = [ self.overlay ];
               networking.hostName = lib.mkDefault "example";
-              environment.systemPackages = [ pkgs.wrap-nix ];
 
               nix = {
                 package = pkgs.nixUnstable;
