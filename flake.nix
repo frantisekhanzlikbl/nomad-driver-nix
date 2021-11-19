@@ -21,7 +21,7 @@
 
         nomad-driver-nix = prev.buildGoModule rec {
           pname = "nomad-driver-nix";
-          version = "2021.11.05.002";
+          version = "2021.11.19.001";
           vendorSha256 = "sha256-FDJpbNtcFEHnZvWip2pvUHF3BFyfcSohrr/3nk9YS24=";
 
           src = inputs.inclusive.lib.inclusive ./. [
@@ -66,7 +66,7 @@
 
       packages = { nomad-driver-nix, bash, coreutils, gocritic, wrap-nix }@pkgs:
         pkgs // {
-          lib = nixpkgs.lib;
+          inherit (nixpkgs) lib;
           defaultPackage = nomad-driver-nix;
         };
 
@@ -82,6 +82,21 @@
             # nixos-rebuild also requires a "system" profile and an /etc/NIXOS tag.
             touch /etc/NIXOS
             ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
+          '';
+
+          systemd.services.console-getty.enable = false;
+
+          # Log everything to the serial console.
+          services.journald.extraConfig = ''
+            ForwardToConsole=yes
+            MaxLevelConsole=debug
+          '';
+
+          systemd.extraConfig = ''
+            # Don't clobber the console with duplicate systemd messages.
+            ShowStatus=no
+            # Allow very slow start
+            DefaultTimeoutStartSec=300
           '';
 
           boot.isContainer = lib.mkDefault true;

@@ -375,12 +375,34 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 	}
 
 	if driverConfig.NixOS != "" {
+		d.eventer.EmitEvent(&drivers.TaskEvent{
+			TaskID:    cfg.ID,
+			AllocID:   cfg.AllocID,
+			TaskName:  cfg.Name,
+			Timestamp: time.Now(),
+			Message:   "Building NixOS",
+			Annotations: map[string]string{
+				"nixos": driverConfig.NixOS,
+			},
+		})
+
 		if err := driverConfig.prepareNixOS(taskDirs.Dir); err != nil {
 			return nil, nil, err
 		}
 	}
 
 	if len(driverConfig.NixPackages) > 0 {
+		d.eventer.EmitEvent(&drivers.TaskEvent{
+			TaskID:    cfg.ID,
+			AllocID:   cfg.AllocID,
+			TaskName:  cfg.Name,
+			Timestamp: time.Now(),
+			Message:   "Building Nix Packages",
+			Annotations: map[string]string{
+				"packages": strings.Join(driverConfig.NixPackages, " "),
+			},
+		})
+
 		if err := driverConfig.prepareNixPackages(taskDirs.Dir); err != nil {
 			return nil, nil, err
 		}
