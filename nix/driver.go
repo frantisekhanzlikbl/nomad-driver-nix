@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -130,6 +131,7 @@ var (
 		"link_journal":      hclspec.NewAttr("link_journal", "string", false),
 		"nixos":             hclspec.NewAttr("nixos", "string", false),
 		"packages":          hclspec.NewAttr("packages", "list(string)", false),
+		"sanitize_names":    hclspec.NewAttr("sanitize_names", "bool", true),
 	})
 
 	// capabilities is returned by the Capabilities RPC and indicates what
@@ -316,6 +318,8 @@ func (d *Driver) RecoverTask(handle *drivers.TaskHandle) error {
 	return nil
 }
 
+var sanitizeName = regexp.MustCompile("[^a-zA-Z0-9-]+")
+
 func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drivers.DriverNetwork, error) {
 	d.logger.Debug("StartTask called")
 	if _, ok := d.tasks.Get(cfg.ID); ok {
@@ -330,7 +334,17 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 	handle := drivers.NewTaskHandle(taskHandleVersion)
 	handle.Config = cfg
 
-	driverConfig.Machine = cfg.Name + "-" + cfg.AllocID
+	if driverConfig.SanitizeNames {
+		saneName := sanitizeName.ReplaceAllString(cfg.Name, "-")
+		cut := len(saneName)
+		if cut > 27 {
+			cut = 27
+		}
+		driverConfig.Machine = saneName[0:cut] + "-" + cfg.AllocID
+	} else {
+		driverConfig.Machine = cfg.Name + "-" + cfg.AllocID
+	}
+
 	driverConfig.Port = make(map[string]string)
 
 	//If network isolation is enabled, disable user namespacing and network-veth

@@ -165,6 +165,7 @@ type MachineConfig struct {
 	LinkJournal      string             `codec:"link_journal"`
 	NixOS            string             `codec:"nixos"`
 	NixPackages      []string           `codec:"packages"`
+	SanitizeNames    bool               `codec:"sanitize_names"`
 }
 
 func (c *MachineConfig) isNixOS() bool       { return c.NixOS != "" }
