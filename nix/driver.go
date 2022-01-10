@@ -131,7 +131,7 @@ var (
 		"link_journal":      hclspec.NewAttr("link_journal", "string", false),
 		"nixos":             hclspec.NewAttr("nixos", "string", false),
 		"packages":          hclspec.NewAttr("packages", "list(string)", false),
-		"sanitize_names":    hclspec.NewAttr("sanitize_names", "bool", true),
+		"sanitize_names":    hclspec.NewAttr("sanitize_names", "bool", false),
 	})
 
 	// capabilities is returned by the Capabilities RPC and indicates what
@@ -330,11 +330,15 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 	if err := cfg.DecodeDriverConfig(&driverConfig); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode driver config: %v", err)
 	}
+	if driverConfig.SanitizeNames == nil {
+		t := true
+		driverConfig.SanitizeNames = &t
+	}
 
 	handle := drivers.NewTaskHandle(taskHandleVersion)
 	handle.Config = cfg
 
-	if driverConfig.SanitizeNames {
+	if *driverConfig.SanitizeNames {
 		saneName := sanitizeName.ReplaceAllString(cfg.Name, "-")
 		cut := len(saneName)
 		if cut > 27 {
