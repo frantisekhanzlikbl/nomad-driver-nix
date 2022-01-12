@@ -4,8 +4,7 @@
   inputs = {
     devshell.url = "github:numtide/devshell";
     inclusive.url = "github:input-output-hk/nix-inclusive";
-    nixpkgs.url = "github:manveru/nixpkgs/use-atomic-bind-mounts";
-    # nixpkgs.url = "path:/home/manveru/ghq/github.com/nixos/nixpkgs";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     utils.url = "github:kreisys/flake-utils";
   };
 
