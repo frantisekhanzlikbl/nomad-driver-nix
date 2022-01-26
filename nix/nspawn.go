@@ -412,7 +412,16 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 	}
 
 	c.BindReadOnly[profile] = profile
-	c.BindReadOnly[filepath.Join(profile, "bin")] = "/bin"
+
+	if entries, err := os.ReadDir(profile); err != nil {
+		return fmt.Errorf("Couldn't read profile directory: %w", err)
+	} else {
+		for _, entry := range entries {
+			name := entry.Name()
+			c.BindReadOnly[filepath.Join(profile, name)] = "/" + name
+		}
+	}
+
 	c.BindReadOnly[filepath.Join(closure, "registration")] = "/registration"
 
 	requisites, err := nixRequisites(closure)
