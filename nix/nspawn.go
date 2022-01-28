@@ -385,7 +385,7 @@ func (c *MachineConfig) prepareNixOS(dir string) error {
 	}
 
 	c.Directory = dir
-	c.createEtc()
+	c.createUsr()
 
 	if len(c.Command) == 0 {
 		c.Command = []string{"/init"}
@@ -434,7 +434,7 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 	}
 
 	c.Directory = dir
-	c.createEtc()
+	c.createUsr()
 
 	if _, found := c.Environment["PATH"]; !found {
 		c.Environment["PATH"] = "/bin"
@@ -443,16 +443,16 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 	return nil
 }
 
-func (c *MachineConfig) createEtc() {
-	needEtc := true
+func (c *MachineConfig) createUsr() {
+	needUsr := true
 	for _, guestDir := range c.BindReadOnly {
 		if strings.HasPrefix("/usr/", guestDir) {
-			needEtc = false
+			needUsr = false
 			break
 		}
 	}
 
-	if needEtc {
+	if needUsr {
 		os.MkdirAll(filepath.Join(c.Directory, "usr"), 0777)
 	}
 }
