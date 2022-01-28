@@ -46,7 +46,7 @@
           '';
         };
 
-        wrap-nix = prev.writeShellScriptBin prev.nixUnstable.name ''
+        wrap-nix = prev.writeShellScriptBin "nix" ''
           set -exuo pipefail
 
           export PATH="$PATH:${prev.git}/bin:${prev.nixUnstable}/bin:${prev.coreutils}/bin"
@@ -60,7 +60,9 @@
           fi
 
           exec ${prev.nixUnstable}/bin/nix "$@"
-        '';
+        '' // {
+          inherit (prev.nixUnstable) version;
+        };
       };
 
       packages = { nomad-driver-nix, bash, coreutils, gocritic, wrap-nix }@pkgs:
