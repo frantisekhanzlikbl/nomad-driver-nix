@@ -417,8 +417,24 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 		return fmt.Errorf("Couldn't read profile directory: %w", err)
 	} else {
 		for _, entry := range entries {
-			name := entry.Name()
-			c.BindReadOnly[filepath.Join(profile, name)] = "/" + name
+			if name := entry.Name(); name != "etc" {
+				c.BindReadOnly[filepath.Join(profile, name)] = "/" + name
+				continue
+			}
+
+			etcEntries, err := os.ReadDir(filepath.Join(profile, "etc"))
+			if err != nil {
+				return fmt.Errorf("Couldn't read profile's /etc directory: %w", err)
+			}
+
+			for _, etcEntry := range etcEntries {
+				etcName := etcEntry.Name()
+				if etcName == "resolv.conf" {
+					// avoid interfering with the --resolv-conf flag
+					continue
+				}
+				c.BindReadOnly[filepath.Join(profile, "etc", etcName)] = "/etc/" + etcName
+			}
 		}
 	}
 
