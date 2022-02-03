@@ -792,7 +792,7 @@ type nixBuildResult struct {
 }
 
 func nixBuild(flake string) (string, error) {
-	cmd := exec.Command("nix", "build", "--no-link", "--json", flake)
+	cmd := exec.Command("nix", "build", "--no-link", "--no-write-lock-file", "--json", flake)
 
 	stdout := &bytes.Buffer{}
 	cmd.Stdout = stdout
