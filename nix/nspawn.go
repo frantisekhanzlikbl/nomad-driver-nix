@@ -758,6 +758,7 @@ func nixBuildClosure(flakes []string, link string) (string, error) {
 		"--out-link", link,
 		"--expr", closureNix,
 		"--impure",
+		"--no-write-lock-file",
 		"--argstr", "flakes", string(j))
 
 	stderr := &bytes.Buffer{}
