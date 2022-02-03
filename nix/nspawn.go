@@ -723,7 +723,7 @@ func DescribeImage(name string) (*ImageProps, error) {
 }
 
 func nixBuildProfile(flakes []string, link string) (string, error) {
-	cmd := exec.Command("nix", append([]string{"profile", "install", "--profile", link}, flakes...)...)
+	cmd := exec.Command("nix", append([]string{"profile", "install", "--no-write-lock-file", "--profile", link}, flakes...)...)
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
 
