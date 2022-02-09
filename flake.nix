@@ -5,15 +5,20 @@
     devshell.url = "github:numtide/devshell";
     inclusive.url = "github:input-output-hk/nix-inclusive";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    # to get follows fix from PR #6036
+    nix.url = "github:nixos/nix/52f52319ad21bdbd7a33bb85eccc83756648f110";
     utils.url = "github:kreisys/flake-utils";
   };
 
-  outputs = { self, nixpkgs, utils, devshell, ... }@inputs:
+  outputs = { self, nixpkgs, utils, devshell, nix, ... }@inputs:
     utils.lib.simpleFlake {
       systems = [ "x86_64-linux" ];
       inherit nixpkgs;
 
-      preOverlays = [ devshell.overlay ];
+      preOverlays = [
+        devshell.overlay
+        nix.overlay
+      ];
 
       overlay = final: prev: {
         gocritic = prev.callPackage ./pkgs/gocritic.nix { };
@@ -49,7 +54,7 @@
         wrap-nix = prev.writeShellScriptBin "nix" ''
           set -exuo pipefail
 
-          export PATH="$PATH:${prev.git}/bin:${prev.nixUnstable}/bin:${prev.coreutils}/bin"
+          export PATH="$PATH:${prev.git}/bin:${prev.nix}/bin:${prev.coreutils}/bin"
           export SSL_CERT_FILE="${prev.cacert}/etc/ssl/certs/ca-bundle.crt"
 
           if ! id nixbld1 &> /dev/null; then
@@ -59,9 +64,9 @@
               nix-store --load-db < /registration
           fi
 
-          exec ${prev.nixUnstable}/bin/nix "$@"
+          exec ${prev.nix}/bin/nix "$@"
         '' // {
-          inherit (prev.nixUnstable) version;
+          inherit (prev.nix) version;
         };
       };
 
@@ -119,7 +124,6 @@
               networking.hostName = lib.mkDefault "example";
 
               nix = {
-                package = pkgs.nixUnstable;
                 systemFeatures = [ "recursive-nix" "nixos-test" ];
                 extraOptions = ''
                   experimental-features = nix-command flakes ca-references recursive-nix
