@@ -5,8 +5,7 @@
     devshell.url = "github:numtide/devshell";
     inclusive.url = "github:input-output-hk/nix-inclusive";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    # to get follows fix from PR #6036
-    nix.url = "github:nixos/nix/52f52319ad21bdbd7a33bb85eccc83756648f110";
+    nix.url = "github:nixos/nix";
     utils.url = "github:kreisys/flake-utils";
   };
 
@@ -25,7 +24,7 @@
 
         nomad-driver-nix = prev.buildGoModule rec {
           pname = "nomad-driver-nix";
-          version = "2022.01.04.001";
+          version = "2022.02.19.001";
           vendorSha256 = "sha256-FDJpbNtcFEHnZvWip2pvUHF3BFyfcSohrr/3nk9YS24=";
 
           src = inputs.inclusive.lib.inclusive ./. [

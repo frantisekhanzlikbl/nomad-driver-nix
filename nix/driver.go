@@ -173,6 +173,10 @@ type Driver struct {
 
 	// logger will log to the Nomad agent
 	logger hclog.Logger
+
+	// Receives OOM events
+	oomChan     chan *OOM
+	oomListener *OOMListener
 }
 
 // Config is the driver configuration set by the SetConfig RPC call
@@ -192,9 +196,10 @@ type TaskState struct {
 }
 
 // NewPlugin returns a new nspawn driver object
-func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
+func NewPlugin(logger hclog.Logger, oomListener *OOMListener) drivers.DriverPlugin {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger = logger.Named(pluginName)
+
 	return &Driver{
 		eventer: eventer.NewEventer(ctx, logger),
 		config: &Config{
@@ -205,12 +210,14 @@ func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 		ctx:            ctx,
 		signalShutdown: cancel,
 		logger:         logger,
+		oomListener:    oomListener,
 	}
 }
 
 func (d *Driver) TaskConfigSchema() (*hclspec.Spec, error) {
 	return taskConfigSpec, nil
 }
+
 func (d *Driver) Capabilities() (*drivers.Capabilities, error) {
 	return capabilities, nil
 }
@@ -348,6 +355,8 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 	} else {
 		driverConfig.Machine = cfg.Name + "-" + cfg.AllocID
 	}
+
+	d.oomChan = d.oomListener.Register(driverConfig.Machine)
 
 	driverConfig.Port = make(map[string]string)
 
@@ -728,6 +737,16 @@ func (d *Driver) handleWait(ctx context.Context, handle *taskHandle, ch chan *dr
 			Signal:   ps.Signal,
 		}
 	}
+
+	// logs about OOM may take a bit to show up.
+	select {
+	case <-time.After(5 * time.Second):
+	case <-d.oomChan:
+		result.OOMKilled = true
+		result.Err = fmt.Errorf("Out of memory")
+	}
+
+	d.oomListener.Deregister(handle.machine.Name)
 
 	for {
 		select {

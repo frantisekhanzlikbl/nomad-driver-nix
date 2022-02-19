@@ -78,7 +78,7 @@ func TestNspawnDriver_Fingerprint(t *testing.T) {
 
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 
 	fingerCh, err := harness.Fingerprint(context.Background())
@@ -97,7 +97,7 @@ func TestNspawnDriver_StartWait(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -128,7 +128,7 @@ func TestNspawnDriver_StartWaitStopKill(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -186,7 +186,7 @@ func TestNspawnDriver_StartWaitRecover(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -253,7 +253,7 @@ func TestNspawnDriver_Stats(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -293,7 +293,7 @@ func TestNspawnDriver_Start_Wait_AllocDir(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -339,7 +339,7 @@ func TestNspawnDriver_HandlerExec(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -378,7 +378,7 @@ func TestNspawnDriver_PortMap(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -424,7 +424,7 @@ func TestNspawnDriver_Ports(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
@@ -473,7 +473,7 @@ func TestNspawnDriver_PortsAndPortMap(t *testing.T) {
 	require := require.New(t)
 	ctestutils.ExecCompatible(t)
 
-	d := NewPlugin(testlog.HCLogger(t))
+	d := NewPlugin(testlog.HCLogger(t), nil)
 	harness := dtestutil.NewDriverHarness(t, d)
 	task := &drivers.TaskConfig{
 		ID:        uuid.Generate(),
