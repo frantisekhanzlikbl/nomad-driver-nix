@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,41 +36,11 @@ const (
 	RawImage string = "raw"
 
 	closureNix = `
-{ flakes }:
+{ path }:
 let
   nixpkgs = builtins.getFlake "github:nixos/nixpkgs/nixos-21.05";
-  inherit (nixpkgs.legacyPackages.x86_64-linux) lib buildPackages;
-  inherit (builtins) match elemAt getFlake length fromJSON;
-
-  resolve = flakeURI:
-    let
-      split = match "^([^#]+)#(.*)$" flakeURI;
-      flake = elemAt split 0;
-      attr = elemAt split 1;
-      path = lib.splitString "." attr;
-      root = getFlake flake;
-
-      paths = [
-        path
-        ([ "packages" "x86_64-linux" ] ++ path)
-        ([ "legacyPackages" "x86_64-linux" ] ++ path)
-      ];
-
-      findRoute = route:
-        if (lib.hasAttrByPath route root) then
-          lib.getAttrFromPath route root
-        else
-          null;
-
-      notNull = e: e != null;
-      allFound = lib.filter notNull (map findRoute paths);
-    in if (length allFound) > 0 then
-      elemAt allFound 0
-    else
-      throw "No attribute '${attr}' in flake '${flake}' found";
-
-  drvs = map resolve (fromJSON flakes);
-in buildPackages.closureInfo { rootPaths = drvs; }
+  inherit (nixpkgs.legacyPackages.x86_64-linux) buildPackages;
+in buildPackages.closureInfo { rootPaths = builtins.storePath path; }
 `
 )
 
@@ -402,7 +371,7 @@ func (c *MachineConfig) prepareNixPackages(dir string) error {
 	}
 
 	closureLink := filepath.Join(dir, "current-closure")
-	closure, err := nixBuildClosure(c.NixPackages, closureLink)
+	closure, err := nixBuildClosure(profileLink, closureLink)
 	if err != nil {
 		return fmt.Errorf("Build of the flakes failed: %v", err)
 	}
@@ -738,28 +707,14 @@ func nixBuildProfile(flakes []string, link string) (string, error) {
 	}
 }
 
-func nixBuildClosure(flakes []string, link string) (string, error) {
-	for i, flake := range flakes {
-		r := regexp.MustCompile(`^path:\.(.*)$`)
-		dir, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		flakes[i] = r.ReplaceAllString(flake, `path:`+dir+`$1`)
-	}
-
-	j, err := json.Marshal(flakes)
-	if err != nil {
-		return "", err
-	}
-
+func nixBuildClosure(profile string, link string) (string, error) {
 	cmd := exec.Command(
 		"nix", "build",
 		"--out-link", link,
 		"--expr", closureNix,
 		"--impure",
 		"--no-write-lock-file",
-		"--argstr", "flakes", string(j))
+		"--argstr", "path", profile)
 
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
