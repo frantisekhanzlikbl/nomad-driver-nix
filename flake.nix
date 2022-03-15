@@ -49,27 +49,9 @@
             mv $out/bin/nomad-driver-nix $out/bin/nix-driver
           '';
         };
-
-        wrap-nix = prev.writeShellScriptBin "nix" ''
-          set -exuo pipefail
-
-          export PATH="$PATH:${prev.git}/bin:${prev.nix}/bin:${prev.coreutils}/bin"
-          export SSL_CERT_FILE="${prev.cacert}/etc/ssl/certs/ca-bundle.crt"
-
-          if ! id nixbld1 &> /dev/null; then
-              mkdir -p /etc
-              echo 'nixbld:x:30000:nixbld1' > /etc/group
-              echo 'nixbld1:x:30001:30000:Nix build user 1:/var/empty:${prev.shadow}/bin/nologin' > /etc/passwd
-              nix-store --load-db < /registration
-          fi
-
-          exec ${prev.nix}/bin/nix "$@"
-        '' // {
-          inherit (prev.nix) version;
-        };
       };
 
-      packages = { nomad-driver-nix, bash, coreutils, gocritic, wrap-nix }@pkgs:
+      packages = { nomad-driver-nix, bash, coreutils, gocritic }@pkgs:
         pkgs // {
           inherit (nixpkgs) lib;
           defaultPackage = nomad-driver-nix;
