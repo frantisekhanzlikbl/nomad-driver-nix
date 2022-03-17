@@ -374,6 +374,13 @@ func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drive
 		driverConfig.Environment[k] = v
 	}
 
+	for k, v := range driverConfig.Environment {
+		if strings.Contains(k, "-") {
+			delete(driverConfig.Environment, k)
+			driverConfig.Environment[strings.ReplaceAll(k, "-", "_")] = v
+		}
+	}
+
 	// bind Task Directories into container
 	taskDirs := cfg.TaskDir()
 	if driverConfig.Bind == nil {
