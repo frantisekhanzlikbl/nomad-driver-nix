@@ -233,7 +233,7 @@ func (c *MachineConfig) ConfigArray() ([]string, error) {
 		args = append(args, "--bind-ro", k+":"+v)
 	}
 	for k, v := range c.Environment {
-		args = append(args, "-E", k+"="+v)
+		args = append(args, "-E", strings.ReplaceAll(k, "-", "_")+"="+v)
 	}
 	for _, v := range c.Port {
 		args = append(args, "-p", v)
