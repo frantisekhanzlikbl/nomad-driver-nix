@@ -147,6 +147,7 @@ func (self OOMListener) parseLine(line string) {
 
 			if len(parts) != 2 {
 				self.log.Error("Unexpected format of oom-kill", "line", line)
+				return
 			}
 
 			switch parts[0] {
@@ -156,6 +157,7 @@ func (self OOMListener) parseLine(line string) {
 				match := r.FindStringSubmatch(scope)
 				if len(match) == 0 {
 					self.log.Error("Unexpected format of oom_memcg", "line", line)
+					return
 				}
 
 				id = match[1]
@@ -164,6 +166,7 @@ func (self OOMListener) parseLine(line string) {
 				pid, err = strconv.ParseUint(parts[1], 10, 64)
 				if err != nil {
 					self.log.Error("Unexpected format of pid", "line", line, "err", err)
+					return
 				}
 			case "task":
 				task = parts[1]
