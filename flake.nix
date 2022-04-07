@@ -59,35 +59,41 @@
 
       extraOutputs.nixosModules = {
         nix-driver-nomad = { pkgs, config, lib, ... }: {
-          system.build.closure = pkgs.buildPackages.closureInfo {
-            rootPaths = [ config.system.build.toplevel ];
+          options.nix-driver-nomad.enable = lib.mkEnableOption "support for running in nomad-driver-nix" // {
+            default = true;
           };
 
-          boot.postBootCommands = lib.mkDefault ''
-            # After booting, register the contents of the Nix store in the container in the Nix database in the tmpfs.
-            ${config.nix.package.out}/bin/nix-store --load-db < /registration
-            # nixos-rebuild also requires a "system" profile and an /etc/NIXOS tag.
-            touch /etc/NIXOS
-            ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
-          '';
+          config = lib.mkIf config.nix-driver-nomad.enable {
+            system.build.closure = pkgs.buildPackages.closureInfo {
+              rootPaths = [ config.system.build.toplevel ];
+            };
 
-          systemd.services.console-getty.enable = false;
+            boot.postBootCommands = lib.mkDefault ''
+              # After booting, register the contents of the Nix store in the container in the Nix database in the tmpfs.
+              ${config.nix.package.out}/bin/nix-store --load-db < /registration
+              # nixos-rebuild also requires a "system" profile and an /etc/NIXOS tag.
+              touch /etc/NIXOS
+              ${config.nix.package.out}/bin/nix-env -p /nix/var/nix/profiles/system --set /run/current-system
+            '';
 
-          # Log everything to the serial console.
-          services.journald.extraConfig = ''
-            ForwardToConsole=yes
-            MaxLevelConsole=debug
-          '';
+            systemd.services.console-getty.enable = false;
 
-          systemd.extraConfig = ''
-            # Don't clobber the console with duplicate systemd messages.
-            ShowStatus=no
-            # Allow very slow start
-            DefaultTimeoutStartSec=300
-          '';
+            # Log everything to the serial console.
+            services.journald.extraConfig = ''
+              ForwardToConsole=yes
+              MaxLevelConsole=debug
+            '';
 
-          boot.isContainer = lib.mkDefault true;
-          networking.useDHCP = lib.mkDefault false;
+            systemd.extraConfig = ''
+              # Don't clobber the console with duplicate systemd messages.
+              ShowStatus=no
+              # Allow very slow start
+              DefaultTimeoutStartSec=300
+            '';
+
+            boot.isContainer = lib.mkDefault true;
+            networking.useDHCP = lib.mkDefault false;
+          };
         };
       };
 
