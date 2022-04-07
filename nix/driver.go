@@ -70,10 +70,7 @@ var (
 			hclspec.NewAttr("boot", "bool", false),
 			hclspec.NewLiteral("false"),
 		),
-		"ephemeral": hclspec.NewDefault(
-			hclspec.NewAttr("ephemeral", "bool", false),
-			hclspec.NewLiteral("true"),
-		),
+		"ephemeral": hclspec.NewAttr("ephemeral", "bool", false),
 		"network_veth": hclspec.NewDefault(
 			hclspec.NewAttr("network_veth", "bool", false),
 			hclspec.NewLiteral("false"),
@@ -115,11 +112,8 @@ var (
 			hclspec.NewAttr("resolv_conf", "string", false),
 			hclspec.NewLiteral(`"copy-host"`),
 		),
-		"user": hclspec.NewAttr("user", "string", false),
-		"volatile": hclspec.NewDefault(
-			hclspec.NewAttr("volatile", "string", false),
-			hclspec.NewLiteral(`"overlay"`),
-		),
+		"user":              hclspec.NewAttr("user", "string", false),
+		"volatile":          hclspec.NewAttr("volatile", "string", false),
 		"working_directory": hclspec.NewAttr("working_directory", "string", false),
 		"bind":              hclspec.NewAttr("bind", "list(map(string))", false),
 		"bind_read_only":    hclspec.NewAttr("bind_read_only", "list(map(string))", false),
