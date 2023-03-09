@@ -41,7 +41,7 @@ const (
 
 var (
 	// populated by Makefile
-	pluginVersion = "dev"
+	pluginVersion = "0.1.0"
 
 	// pluginInfo is the response returned for the PluginInfo RPC
 	pluginInfo = &base.PluginInfoResponse{
